@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/opdev/getocprange"
+	"github.com/redhat-certification/chart-verifier/internal/chartverifier/utils"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/lint"
 	"helm.sh/helm/v3/pkg/lint/support"
@@ -64,6 +65,8 @@ const (
 	ImageCertified               = "Image is Red Hat certified"
 	ImageNotCertified            = "Image is not Red Hat certified"
 	ChartTestingSuccess          = "Chart tests have passed"
+	ClusterNotEOL                = "Chart tests ran on a non EOL cluster"
+	ClusterIsEOL                 = "Chart tests ran on an EOL cluster"
 	MetadataFailure              = "Empty metadata in chart"
 	RequiredAnnotationsSuccess   = "All required annotations present"
 	RequiredAnnotationsFailure   = "Missing required annotations"
@@ -528,4 +531,28 @@ func certifyImages(r Result, opts *CheckOptions, registry string) Result {
 	}
 
 	return r
+}
+
+func ClusterIsNotEOL(opt *CheckOptions) (Result, error) {
+
+	// Get version with k8s client
+	version, err := GetVersion(opt.HelmEnvSettings)
+	if err != nil {
+		return Result{}, err
+	}
+
+	// Get lifecycle status for version
+	lifeCycleData := utils.LifeCycleData{}
+	lifecycleStatus, err := lifeCycleData.GetLifecycleStatus(version)
+	if err != nil {
+		return Result{}, err
+	}
+
+	result := NewResult(true, ClusterNotEOL)
+	if lifecycleStatus == "End of life" {
+		result.SetResult(false, ClusterIsEOL)
+		return result, nil
+	}
+
+	return result, nil
 }
